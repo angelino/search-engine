@@ -5,34 +5,50 @@
             [hickory.select :as s]))
 
 (def indexed-pages (atom #{}))
-
-(defn add-index [page]
-  (swap! indexed-pages conj page)
-  (println (str "Indexed: " page)))
+(def indexed-words (atom {}))
 
 (defn page-indexed? [page]
   (contains? @indexed-pages page))
-  
-(defn download [page]
-  (client/get page))
 
-(defn find-links [content]
-  (let [document (html/parse content)
-        links (s/select (s/tag :a) (html/as-hickory document))]
+(defn download [page]
+  (try
+    (client/get page)
+    (catch Exception ex
+      (println (str "It was not possible download " page)))))
+
+(defn find-links [document]
+  (let [links (s/select (s/tag :a) (html/as-hickory document))]
     (filter #(str/starts-with? % "http")
             (map :href (filter #(not (nil? (:href %)))
                                (map :attrs links))))))
 
+(defn get-only-text [document]
+  (let [elements (s/select (s/node-type :element) (html/as-hickory document))
+        texts (filter string?
+                      (map #(first (:content %)) elements))]
+    (clojure.string/join " " texts)))
+
+(defn separate-words [text]
+  (clojure.string/split (.toLowerCase text) #"\W+"))
+
+(defn add-index [page document]
+  (println (str "Indexing: " page))
+  (let [text (get-only-text document)
+        words (separate-words text)]
+    (println (frequencies words))
+    (swap! indexed-pages conj page)))
+
 (defn crawl-page [page]
   (if-let [content (:body (download page))]
-    (do
-      (add-index page)
-      (find-links content))))
+    (if-let [document (html/parse content)]
+      (do
+        (add-index page document)
+        (find-links document)))))
 
 (defn not-indexed-pages [pages]
   (filter #(not (page-indexed? %)) pages))
 
-(defn crawl-pages! [pages]
+(defn crawl-pages [pages]
   (let [new-pages (atom #{})]
     (doall
      (for [page (not-indexed-pages pages)]
@@ -40,17 +56,15 @@
          (let [links (set (crawl-page page))]
            (printf "Links found: %s\n" (count links))
            (swap! new-pages clojure.set/union links)))))
-     @new-pages))
+    @new-pages))
 
 (defn crawl [pages depth]
   (let [pgs (atom (set pages))]
     (doall
      (for [i (range depth)]
-       (reset! pgs (crawl-pages! @pgs))))))
+       (reset! pgs (crawl-pages @pgs))))))
 
 (comment
   (crawl-page "https://pt.wikipedia.org/wiki/Wikipédia:Página_principal")
-  (crawl ["http://www.google.com"] 2)
-)
+  (crawl ["https://pt.wikipedia.org/wiki/Wikipédia:Página_principal"] 2))
 
-; find the links
