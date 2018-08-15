@@ -23,7 +23,8 @@
                                (map :attrs links))))))
 
 (defn get-only-text [document]
-  (let [elements (s/select (s/node-type :element) (html/as-hickory document))
+  (let [elements (s/select (s/and (s/node-type :element) (s/not (s/tag :script)))
+                           (html/as-hickory document))
         texts (filter string?
                       (map #(first (:content %)) elements))]
     (clojure.string/join " " texts)))
