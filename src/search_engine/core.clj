@@ -30,6 +30,9 @@
     (clojure.string/join " " texts)))
 
 (defn separate-words [text]
+  ;; split at one or more non-word character
+  ;; Ex.:
+  ;; "   abc 123   balão" results ["" "123" "abc" "bal" "o"]
   (clojure.string/split (.toLowerCase text) #"\W+"))
 
 (defn add-index [page document]
