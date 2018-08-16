@@ -5,7 +5,9 @@
             [hickory.select :as s]))
 
 (def indexed-pages (atom #{}))
-(def indexed-words (atom {}))
+
+;; [[word page location]]
+(def indexed-words (atom []))
 
 (defn page-indexed? [page]
   (contains? @indexed-pages page))
@@ -35,12 +37,27 @@
   ;; "   abc 123   balão" results ["" "123" "abc" "bal" "o"]
   (clojure.string/split (.toLowerCase text) #"\W+"))
 
+(defn indexable-word? [word]
+  (let [ignored-words #{"" "the" "of" "to" "and" "a" "in" "is" "it"}]
+    (not (contains? ignored-words word))))
+
+(defn add-indexed-words! [page words]
+  (doall
+   (for [el (map-indexed (fn [idx word]
+                           (vector word page idx))
+                         words)]
+     (swap! indexed-words conj el)))
+  (println (str (count words) " word(s) indexed")))
+
+(defn add-indexed-page! [page]
+  (swap! indexed-pages conj page))
+
 (defn add-index [page document]
   (println (str "Indexing: " page))
   (let [text (get-only-text document)
-        words (separate-words text)]
-    (println (frequencies words))
-    (swap! indexed-pages conj page)))
+        words (filter indexable-word? (separate-words text))]
+    (add-indexed-words! page words)
+    (add-indexed-page! page)))
 
 (defn crawl-page [page]
   (if-let [content (:body (download page))]
