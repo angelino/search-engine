@@ -2,15 +2,10 @@
   (:require [clojure.string :as str]
             [clj-http.client :as client]
             [hickory.core :as html]
-            [hickory.select :as s]))
-
-(def indexed-pages (atom #{}))
-
-;; [[word page location]]
-(def indexed-words (atom []))
-
-(defn page-indexed? [page]
-  (contains? @indexed-pages page))
+            [hickory.select :as s]
+            [search-engine.index :refer [page-indexed?
+                                         add-to-page-index!
+                                         add-to-word-index!]]))
 
 (defn download [page]
   (try
@@ -41,23 +36,12 @@
   (let [ignored-words #{"" "the" "of" "to" "and" "a" "in" "is" "it"}]
     (not (contains? ignored-words word))))
 
-(defn add-indexed-words! [page words]
-  (doall
-   (for [el (map-indexed (fn [idx word]
-                           (vector word page idx))
-                         words)]
-     (swap! indexed-words conj el)))
-  (println (str (count words) " word(s) indexed")))
-
-(defn add-indexed-page! [page]
-  (swap! indexed-pages conj page))
-
 (defn add-index [page document]
   (println (str "Indexing: " page))
   (let [text (get-only-text document)
         words (filter indexable-word? (separate-words text))]
-    (add-indexed-words! page words)
-    (add-indexed-page! page)))
+    (add-to-word-index! page words)
+    (add-to-page-index! page)))
 
 (defn crawl-page [page]
   (if-let [content (:body (download page))]
